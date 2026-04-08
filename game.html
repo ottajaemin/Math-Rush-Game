@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Math Rush</title>
+
+<style>
+body {
+  margin:0;
+  font-family:'Segoe UI',sans-serif;
+  background:radial-gradient(circle at center,#111,#000);
+  color:white;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  height:100vh;
+  transition:background 0.5s ease;
+}
+
+body.danger {background:radial-gradient(circle farthest-corner,#600,#000);}
+body.timeout {background:#900;}
+
+.game {
+  width:360px;
+  padding:20px;
+  border-radius:20px;
+  background:#1a1a1a;
+  box-shadow:0 0 30px rgba(0,255,255,0.2);
+}
+
+.top {
+  display:flex;
+  justify-content:space-between;
+  margin-bottom:20px;
+  font-size:18px;
+}
+
+.timer {color:#00ffcc;}
+.score {color:#ffcc00;}
+
+.question {
+  text-align:center;
+  font-size:28px;
+  margin:20px 0;
+  font-weight:bold;
+}
+
+.choices {
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+}
+
+button {
+  padding:15px;
+  font-size:18px;
+  border:none;
+  border-radius:10px;
+  background:#222;
+  color:white;
+  cursor:pointer;
+  transition:0.2s;
+}
+
+button:hover {background:#333;}
+
+.correct {background:#00cc66!important;}
+.wrong {background:#cc0033!important;}
+
+.bottom {
+  margin-top:20px;
+  display:flex;
+  justify-content:space-between;
+}
+
+.combo {color:#ff6699;}
+
+.start-screen,.end-screen {text-align:center;}
+.hidden {display:none;}
+
+.big-btn {
+  margin-top:10px;
+  padding:12px 25px;
+  font-size:16px;
+  border-radius:10px;
+  background:#00ccff;
+  color:black;
+  border:none;
+  cursor:pointer;
+}
+
+ul {
+  text-align:left;
+  padding-left:20px;
+}
+</style>
+
+</head>
+
+<body>
+
+<div class="game">
+
+  <!-- 시작 화면 -->
+
+  <div class="start-screen" id="startScreen">
+    <h1>⚡ Math Rush</h1>
+    <p>난이도를 선택하세요!</p>
+    <button class="big-btn" onclick="startGame('easy')">Easy</button>
+    <button class="big-btn" onclick="startGame('normal')">Normal</button>
+    <button class="big-btn" onclick="startGame('hard')">Hard</button>
+    <button class="big-btn" onclick="startGame('impossible')">Impossible</button>
+  </div>
+
+  <!-- 플레이 화면 -->
+
+  <div class="play-screen hidden" id="playScreen">
+    <div class="top">
+      <div class="timer">⏱ <span id="time">0</span></div>
+      <div class="score">🏆 <span id="score">0</span></div>
+    </div>
+
+```
+<div class="question" id="question">1 + 1</div>
+<div class="choices" id="choices"></div>
+
+<div class="bottom">
+  <div class="combo">🔥 x<span id="combo">0</span></div>
+  <div id="feedback"></div>
+</div>
+```
+
+  </div>
+
+  <!-- 종료 화면 -->
+
+  <div class="end-screen hidden" id="endScreen">
+    <h2>🎉 게임 종료!</h2>
+    <p>점수: <span id="finalScore"></span></p>
+    <input type="text" id="playerName" placeholder="이름 입력">
+    <br>
+    <button class="big-btn" onclick="saveScore()">등록</button>
+
+```
+<h3>🏆 리더보드</h3>
+<ul id="leaderboard"></ul>
+
+<button class="big-btn" onclick="location.reload()">다시하기</button>
+```
+
+  </div>
+
+</div>
+
+<script>
+let score=0,time,combo=0,correctAnswer,timer,minRange,maxRange,difficulty,questionTimer;
+
+function startGame(d){
+  difficulty=d;
+  document.getElementById('startScreen').classList.add('hidden');
+  document.getElementById('playScreen').classList.remove('hidden');
+
+  if(d==='easy'){minRange=0;maxRange=10;time=30;}
+  else if(d==='normal'){minRange=11;maxRange=30;time=60;}
+  else if(d==='hard'){minRange=50;maxRange=100;time=120;}
+  else if(d==='impossible'){minRange=0;maxRange=300;time=120;}
+
+  document.getElementById('time').textContent=time;
+  nextQuestion();
+
+  timer=setInterval(()=>{
+    time--;
+    document.getElementById('time').textContent=time;
+    if(time<=0) endGame();
+  },1000);
+}
+
+function nextQuestion(){
+  clearInterval(questionTimer);
+  document.body.classList.remove('danger','timeout');
+
+  let a=Math.floor(Math.random()*(maxRange-minRange+1))+minRange;
+  let b=Math.floor(Math.random()*(maxRange-minRange+1))+minRange;
+
+  if(difficulty==='impossible'){
+    a=parseFloat((Math.random()*300).toFixed(3));
+    b=parseFloat((Math.random()*300).toFixed(3));
+  }
+
+  let ops=(difficulty==='impossible')?['+','-','*','/','^']:['+','-','/','^'];
+  let op=ops[Math.floor(Math.random()*ops.length)];
+
+  if(op==='+') correctAnswer=(a+b).toFixed(difficulty==='impossible'?3:0);
+  if(op==='-') correctAnswer=(a-b).toFixed(difficulty==='impossible'?3:0);
+  if(op==='*') correctAnswer=(a*b).toFixed(difficulty==='impossible'?3:0);
+  if(op==='/') correctAnswer=(a/b).toFixed(difficulty==='impossible'?3:0);
+  if(op==='^') correctAnswer=(Math.pow(a,2)).toFixed(difficulty==='impossible'?3:0);
+
+  document.getElementById('question').textContent=(op==='^')?`${a} ^ 2`:`${a} ${op} ${b}`;
+
+  let answers=[correctAnswer];
+
+  while(answers.length<4){
+    let wrong=(difficulty==='impossible')
+      ? (parseFloat(correctAnswer)+(Math.random()*0.05)).toFixed(3)
+      : (parseInt(correctAnswer)+Math.floor(Math.random()*10-5)).toString();
+
+    if(!answers.includes(wrong)) answers.push(wrong);
+  }
+
+  answers.sort(()=>Math.random()-0.5);
+
+  let choicesDiv=document.getElementById('choices');
+  choicesDiv.innerHTML='';
+
+  answers.forEach(ans=>{
+    let btn=document.createElement('button');
+    btn.textContent=ans;
+    btn.onclick=()=>checkAnswer(btn,ans);
+    choicesDiv.appendChild(btn);
+  });
+
+  let qTime=(difficulty==='impossible')?15:9999;
+
+  questionTimer=setInterval(()=>{
+    qTime--;
+
+    if(difficulty==='impossible'){
+      document.getElementById('feedback').textContent=`남은 문제 시간: ${qTime}s`;
+
+      if(qTime<=5) document.body.classList.add('danger');
+
+      if(qTime<=0){
+        clearInterval(questionTimer);
+        document.body.classList.add('timeout');
+        showCorrect();
+
+        setTimeout(()=>{
+          document.body.classList.remove('danger','timeout');
+          nextQuestion();
+        },1000);
+      }
+    }
+  },1000);
+}
+
+function checkAnswer(button,answer){
+  clearInterval(questionTimer);
+  let feedback=document.getElementById('feedback');
+
+  if(answer==correctAnswer){
+    score+=10+combo*10;
+    combo++;
+    button.classList.add('correct');
+    feedback.textContent='✅';
+  }else{
+    score=Math.max(0, score-50);
+    combo=0;
+    button.classList.add('wrong');
+    feedback.textContent='❌';
+    showCorrect();
+  }
+
+  document.getElementById('score').textContent=score;
+  document.getElementById('combo').textContent=combo;
+
+  setTimeout(()=>{
+    nextQuestion();
+    feedback.textContent='';
+  },800);
+}
+
+function showCorrect(){
+  [...document.querySelectorAll('#choices button')].forEach(btn=>{
+    if(btn.textContent==correctAnswer) btn.style.background='blue';
+  });
+}
+
+function endGame(){
+  clearInterval(timer);
+  clearInterval(questionTimer);
+
+  document.getElementById('playScreen').classList.add('hidden');
+  document.getElementById('endScreen').classList.remove('hidden');
+
+  document.getElementById('finalScore').textContent=score;
+  loadLeaderboard();
+}
+
+function saveScore(){
+  let name=document.getElementById('playerName').value || "Unknown";
+
+  let leaderboard=JSON.parse(localStorage.getItem('leaderboard')) || [];
+  leaderboard.push({name,score});
+
+  leaderboard.sort((a,b)=>b.score-a.score);
+
+  localStorage.setItem('leaderboard',JSON.stringify(leaderboard));
+
+  document.getElementById('playerName').value='';
+  loadLeaderboard();
+}
+
+function loadLeaderboard(){
+  let leaderboard=JSON.parse(localStorage.getItem('leaderboard')) || [];
+  let list=document.getElementById('leaderboard');
+
+  list.innerHTML='';
+
+  leaderboard.slice(0,5).forEach((entry,index)=>{
+    let li=document.createElement('li');
+    li.textContent=`${index+1}위 - ${entry.name}: ${entry.score}`;
+    list.appendChild(li);
+  });
+}
+</script>
+
+</body>
+</html>
